@@ -151,6 +151,8 @@ MENU_TEXT = (
     "/addmovie - Add a new movie (poster + files)\n"
     "/add [code] - Add extra files to a movie\n"
     "/list - List all movies with their codes\n"
+    "/recaption [code] - Change the caption of a movie's files\n"
+    "/remove [code] - Delete a movie from the channel & database\n"
     "/done - Finish sending files\n"
     "/cancel - Cancel the current action"
 )
@@ -161,6 +163,8 @@ BOT_COMMANDS = [
     BotCommand("addmovie", "Add a new movie"),
     BotCommand("add", "Add extra files: /add [code]"),
     BotCommand("list", "List all movies with codes"),
+    BotCommand("recaption", "Change caption: /recaption [code]"),
+    BotCommand("remove", "Delete a movie: /remove [code]"),
     BotCommand("done", "Finish sending files"),
     BotCommand("cancel", "Cancel current action"),
 ]
@@ -240,8 +244,8 @@ async def done_cmd(client, message):
             movie = await wizard_movies.find_one({"_id": no})
             await ensure_channel(client)
             before = len(movie["files"])
-            names = await upload_files(client, st["files"], movie["keywords"], movie["poster_msg_id"])
-            await wizard_movies.update_one({"_id": no}, {"$push": {"files": {"$each": names}}})
+            names, ids = await upload_files(client, st["files"], movie["keywords"], movie["poster_msg_id"])
+            await wizard_movies.update_one({"_id": no}, {"$push": {"files": {"$each": names}, "file_msg_ids": {"$each": ids}}})
             total = before + len(names)
             await msg.edit_text(f"✅ **Added {len(names)} file(s)**\n🎬 {movie['title']}\n🔢 Code: `{no}`\n📁 Total files: {total}")
         except Exception as e:
@@ -289,7 +293,58 @@ async def list_cmd(client, message):
     chunk += "\nTap a code to copy, then send: /add [code]\nSearch: /list [name]"
     await message.reply_text(chunk)
 
-@app.on_message(filters.text & ~filters.command(["start", "menu", "addmovie", "add", "list", "cancel", "done"]))
+@app.on_message(filters.command("recaption"))
+async def recaption_cmd(client, message):
+    user_id = message.from_user.id
+    args = message.command[1:]
+    if not args or not args[0].lstrip("#").isdigit():
+        await message.reply_text("Usage: /recaption [movie code]\nExample: /recaption 48213")
+        return
+    no = int(args[0].lstrip("#"))
+    movie = await wizard_movies.find_one({"_id": no})
+    if not movie:
+        await message.reply_text(f"❌ No movie with code {no}. Use /list to see all movies.")
+        return
+    if not movie.get("file_msg_ids"):
+        await message.reply_text(
+            f"⚠️ **{movie['title']}** was uploaded before file tracking, so I cannot edit its captions.\n\n"
+            f"Delete it with `/remove {no} confirm`, then upload it again with /addmovie.")
+        return
+    WIZARD_STATE[user_id] = {"step": "awaiting_recaption", "movie_no": no}
+    await message.reply_text(
+        f"✏️ **{movie['title']}** (code `{no}`)\n📁 {len(movie['file_msg_ids'])} file(s)\n\n"
+        f"Send the NEW caption now. It will replace the caption on all its files.\nType /cancel to abort.")
+
+@app.on_message(filters.command("remove"))
+async def remove_cmd(client, message):
+    args = message.command[1:]
+    if not args or not args[0].lstrip("#").isdigit():
+        await message.reply_text("Usage: /remove [movie code]\nExample: /remove 48213")
+        return
+    no = int(args[0].lstrip("#"))
+    movie = await wizard_movies.find_one({"_id": no})
+    if not movie:
+        await message.reply_text(f"❌ No movie with code {no}. Use /list to see all movies.")
+        return
+    tracked = len(movie.get("file_msg_ids", []))
+    if not (len(args) > 1 and args[1].lower() == "confirm"):
+        note = "" if tracked == len(movie["files"]) else "\n⚠️ Some files were uploaded before tracking - delete those by hand in the channel."
+        await message.reply_text(
+            f"⚠️ This will delete **{movie['title']}** (code `{no}`): the poster post, {tracked} file post(s) in the channel, and its database entries.{note}\n\n"
+            f"To confirm send:\n`/remove {no} confirm`")
+        return
+    msg = await message.reply_text("🗑 Removing...")
+    try:
+        await ensure_channel(client)
+        ids = [movie["poster_msg_id"]] + list(movie.get("file_msg_ids", []))
+        await client.delete_messages(DATABASE_CHANNEL_ID, ids)
+    except Exception as e:
+        print(f"⚠️ Could not delete channel posts: {e}", flush=True)
+    await movies_col.delete_many({"file_name": {"$in": movie["files"]}})
+    await wizard_movies.delete_one({"_id": no})
+    await msg.edit_text(f"🗑 Removed **{movie['title']}** (code `{no}`).")
+
+@app.on_message(filters.text & ~filters.command(["start", "menu", "addmovie", "add", "list", "recaption", "remove", "cancel", "done"]))
 async def text_handler(client, message):
     user_id = message.from_user.id
     if user_id not in WIZARD_STATE:
@@ -322,6 +377,28 @@ async def text_handler(client, message):
             
         await msg.delete()
         
+    elif state["step"] == "awaiting_recaption":
+        no = state["movie_no"]
+        new_caption = message.text[:1024]
+        del WIZARD_STATE[user_id]
+        msg = await message.reply_text("🔄 Updating captions...")
+        movie = await wizard_movies.find_one({"_id": no})
+        ok = fail = 0
+        await ensure_channel(client)
+        for mid in movie["file_msg_ids"]:
+            try:
+                await client.edit_message_caption(DATABASE_CHANNEL_ID, mid, new_caption, parse_mode=ParseMode.DISABLED)
+                ok += 1
+            except Exception as e:
+                if "MESSAGE_NOT_MODIFIED" in str(e).upper() or "NOT MODIFIED" in str(e).upper():
+                    ok += 1
+                else:
+                    fail += 1
+                    print(f"⚠️ Could not edit {mid}: {e}", flush=True)
+            await asyncio.sleep(1)
+        await wizard_movies.update_one({"_id": no}, {"$set": {"keywords": new_caption}})
+        await msg.edit_text(f"✅ Caption updated on {ok} file(s)." + (f"\n⚠️ {fail} failed (deleted or no permission)." if fail else ""))
+
     elif state["step"] == "awaiting_keywords":
         state["keywords"] = message.text
         await finish_wizard(client, message, state)
@@ -345,6 +422,7 @@ async def new_movie_code():
 async def upload_files(client, files, keywords, poster_msg_id):
     """Copy files into the DB channel as replies to the poster; index names in Mongo."""
     names = []
+    ids = []
     for f_msg in files:
         doc = f_msg.document or f_msg.video
         file_name = getattr(doc, 'file_name', None) or "Unknown_Movie.mkv"
@@ -366,7 +444,7 @@ async def upload_files(client, files, keywords, poster_msg_id):
         # Caption = exactly what the user typed (Telegram caption limit is 1024 chars)
         file_caption = keywords[:1024]
 
-        await client.copy_message(
+        sent = await client.copy_message(
             chat_id=DATABASE_CHANNEL_ID,
             from_chat_id=f_msg.chat.id,
             message_id=f_msg.id,
@@ -374,10 +452,11 @@ async def upload_files(client, files, keywords, poster_msg_id):
             parse_mode=ParseMode.DISABLED,
             reply_to_message_id=poster_msg_id
         )
-        await movies_col.insert_one({"file_name": file_name})
+        await movies_col.update_one({"file_name": file_name}, {"$set": {"file_name": file_name}}, upsert=True)
         names.append(file_name)
+        ids.append(sent.id)
         await asyncio.sleep(1)
-    return names
+    return names, ids
 
 async def finish_wizard(client, message, state):
     msg = await message.reply_text("🔄 Compiling and uploading everything to the Database Channel...")
@@ -404,13 +483,13 @@ async def finish_wizard(client, message, state):
             poster_msg = await client.send_message(DATABASE_CHANNEL_ID, caption)
             
         # 2. Copy files as replies to the poster
-        names = await upload_files(client, state["files"], keywords, poster_msg.id)
+        names, ids = await upload_files(client, state["files"], keywords, poster_msg.id)
 
         # 3. Register the movie with a number
         movie_no = await new_movie_code()
         await wizard_movies.insert_one({
             "_id": movie_no, "title": tmdb["title"], "keywords": keywords,
-            "poster_msg_id": poster_msg.id, "poster": tmdb.get("poster"), "files": names,
+            "poster_msg_id": poster_msg.id, "poster": tmdb.get("poster"), "files": names, "file_msg_ids": ids,
             "created": datetime.datetime.utcnow()})
 
         await msg.edit_text(
