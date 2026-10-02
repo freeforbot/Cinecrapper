@@ -9,6 +9,8 @@ try:
 except RuntimeError:
     asyncio.set_event_loop(asyncio.new_event_loop())
 
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 import aiohttp
 from pyrogram import Client, filters, idle
 from pyrogram.enums import ParseMode
@@ -21,6 +23,21 @@ API_HASH = os.environ.get("API_HASH")
 MONGO_URI = os.environ.get("MONGO_URI")
 DATABASE_CHANNEL_ID = -1003975570574
 TMDB_API_KEY = os.environ.get("TMDB_API_KEY")
+
+# Tiny web server so Render's web service sees an open port
+class _Ping(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Wizard bot is running")
+    def log_message(self, *a):
+        pass
+
+def _serve():
+    port = int(os.environ.get("PORT", 10000))
+    HTTPServer(("0.0.0.0", port), _Ping).serve_forever()
+
+threading.Thread(target=_serve, daemon=True).start()
 
 missing = [k for k in ("BOT_TOKEN", "API_ID", "API_HASH", "MONGO_URI", "TMDB_API_KEY") if not os.environ.get(k)]
 if missing:
