@@ -1,0 +1,17 @@
+# Environment Variables (CRITICAL!)
+.env
+
+# Pyrogram session files
+*.session
+*.session-journal
+
+# Python Virtual Environments
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+
+# IDEs
+.vscode/
+.idea/

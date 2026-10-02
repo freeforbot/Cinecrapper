@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>LoveToRide | Peddi (2026) Tamil (DS4K 1080p NF WEB Rip E AC3 5 @MoviiWrld.mkv</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+  <style>
+    :root {
+      --amber: #F59E0B;
+      --coral: #F97316;
+      --crimson: #EF4444;
+      --deep: #0A0A0F;
+      --surface: #111118;
+      --elevated: #1A1A26;
+      --border: rgba(255,255,255,0.07);
+      --text-dim: rgba(255,255,255,0.4);
+      --text-mid: rgba(255,255,255,0.65);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background-color: var(--deep);
+      color: #fff;
+      min-height: 100vh;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    /* ── Ambient background ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 70% 60% at 15% 10%, rgba(249,115,22,0.12) 0%, transparent 60%),
+        radial-gradient(ellipse 55% 50% at 85% 80%, rgba(239,68,68,0.1) 0%, transparent 55%),
+        radial-gradient(ellipse 40% 40% at 50% 50%, rgba(245,158,11,0.05) 0%, transparent 60%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Noise texture */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .page-wrap {
+      position: relative;
+      z-index: 1;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 32px 16px 48px;
+    }
+
+    /* ── Header ── */
+    .header {
+      width: 100%;
+      max-width: 420px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 28px;
+      opacity: 0;
+      transform: translateY(-12px);
+      animation: slideDown 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.1s forwards;
+    }
+
+    .logo {
+      font-family: 'Syne', sans-serif;
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
+
+    .logo span {
+      background: linear-gradient(90deg, var(--amber), var(--coral), var(--crimson));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .secure-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-dim);
+      background: var(--elevated);
+      border: 1px solid var(--border);
+      padding: 5px 11px;
+      border-radius: 100px;
+      letter-spacing: 0.3px;
+    }
+
+    .secure-badge i { color: #10B981; font-size: 9px; }
+
+    /* ── Main card ── */
+    .main-card {
+      width: 100%;
+      max-width: 420px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      overflow: hidden;
+      margin-bottom: 14px;
+      opacity: 0;
+      transform: translateY(20px);
+      animation: slideUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.25s forwards;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06);
+    }
+
+    /* Top accent stripe */
+    .card-stripe {
+      height: 3px;
+      background: linear-gradient(90deg, var(--amber), var(--coral), var(--crimson));
+    }
+
+    .card-body {
+      padding: 28px 28px 32px;
+    }
+
+    /* ── File header row ── */
+    .file-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 28px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .file-icon-wrap {
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    .file-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, rgba(249,115,22,0.2), rgba(239,68,68,0.2));
+      border: 1px solid rgba(249,115,22,0.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+    }
+
+    .file-icon-lock {
+      position: absolute;
+      bottom: -4px;
+      right: -4px;
+      width: 20px;
+      height: 20px;
+      background: var(--crimson);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      border: 2px solid var(--surface);
+    }
+
+    .file-meta { flex: 1; min-width: 0; }
+
+    .file-label {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--coral);
+      margin-bottom: 5px;
+    }
+
+    .file-name {
+      font-family: 'Syne', sans-serif;
+      font-size: 15px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: #fff;
+      margin-bottom: 4px;
+    }
+
+    .file-enc {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    .file-enc i { color: #10B981; font-size: 9px; }
+
+    /* ── Decrypt animation ── */
+    .decrypt-ring {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin-bottom: 24px;
+      position: relative;
+    }
+
+    .ring-container {
+      position: relative;
+      width: 110px;
+      height: 110px;
+    }
+
+    .ring-svg {
+      position: absolute;
+      inset: 0;
+      transform: rotate(-90deg);
+    }
+
+    .ring-track { fill: none; stroke: rgba(255,255,255,0.05); stroke-width: 4; }
+
+    .ring-fill {
+      fill: none;
+      stroke-width: 4;
+      stroke-linecap: round;
+      stroke: url(#ringGrad);
+      stroke-dasharray: 298;
+      stroke-dashoffset: 298;
+      transition: stroke-dashoffset 0.15s linear;
+    }
+
+    .ring-inner {
+      position: absolute;
+      inset: 12px;
+      border-radius: 50%;
+      background: var(--elevated);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--border);
+    }
+
+    #ring-num {
+      font-family: 'Syne', sans-serif;
+      font-size: 28px;
+      font-weight: 800;
+      line-height: 1;
+      background: linear-gradient(135deg, var(--amber), var(--coral));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .ring-label {
+      font-size: 9px;
+      font-weight: 500;
+      color: var(--text-dim);
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      margin-top: 2px;
+    }
+
+    /* Orbiting dot */
+    .orbit-dot {
+      position: absolute;
+      inset: 0;
+      animation: orbitSpin 1.2s linear infinite;
+    }
+
+    .orbit-dot::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--amber);
+      box-shadow: 0 0 8px var(--amber), 0 0 16px rgba(245,158,11,0.5);
+    }
+
+    @keyframes orbitSpin { to { transform: rotate(360deg); } }
+
+    /* ── Steps ── */
+    .steps {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 24px;
+    }
+
+    .step {
+      flex: 1;
+      text-align: center;
+      padding: 10px 6px;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      transition: all 0.4s ease;
+    }
+
+    .step.active {
+      background: rgba(249,115,22,0.1);
+      border-color: rgba(249,115,22,0.3);
+    }
+
+    .step.done {
+      background: rgba(16,185,129,0.08);
+      border-color: rgba(16,185,129,0.25);
+    }
+
+    .step-icon {
+      font-size: 14px;
+      margin-bottom: 4px;
+      color: var(--text-dim);
+      transition: color 0.3s;
+    }
+
+    .step.active .step-icon { color: var(--coral); }
+    .step.done .step-icon { color: #10B981; }
+
+    .step-txt {
+      font-size: 9px;
+      font-weight: 500;
+      letter-spacing: 0.5px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      transition: color 0.3s;
+    }
+
+    .step.active .step-txt { color: rgba(249,115,22,0.9); }
+    .step.done .step-txt { color: rgba(16,185,129,0.8); }
+
+    /* ── Download button ── */
+    #download-btn {
+      width: 100%;
+      padding: 16px;
+      border-radius: 14px;
+      border: none;
+      font-family: 'Syne', sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      cursor: not-allowed;
+      background: var(--elevated);
+      color: var(--text-dim);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      position: relative;
+      overflow: hidden;
+    }
+
+    #download-btn.ready {
+      cursor: pointer;
+      color: #fff;
+      background: linear-gradient(135deg, var(--amber), var(--coral), var(--crimson));
+      border-color: transparent;
+      box-shadow: 0 8px 32px rgba(239,68,68,0.35), 0 2px 8px rgba(0,0,0,0.3);
+      animation: btnPulse 2s ease-in-out infinite;
+    }
+
+    #download-btn.ready::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,0.15), transparent);
+      pointer-events: none;
+    }
+
+    #download-btn.ready:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 40px rgba(239,68,68,0.5), 0 4px 12px rgba(0,0,0,0.4);
+      animation: none;
+    }
+
+    #download-btn.ready:active {
+      transform: translateY(0px);
+    }
+
+    @keyframes btnPulse {
+      0%, 100% { box-shadow: 0 8px 32px rgba(239,68,68,0.35); }
+      50% { box-shadow: 0 8px 48px rgba(239,68,68,0.6), 0 0 0 6px rgba(239,68,68,0.08); }
+    }
+
+    /* Shimmer sweep */
+    #download-btn.ready::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.18) 50%, transparent 60%);
+      background-size: 200% 100%;
+      animation: shimmer 2.5s ease-in-out infinite;
+    }
+
+    @keyframes shimmer {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+
+    /* ── Telegram channel card ── */
+    .tg-card {
+      width: 100%;
+      max-width: 420px;
+      background: var(--surface);
+      border: 1px solid rgba(249,115,22,0.2);
+      border-radius: 20px;
+      padding: 22px 24px;
+      margin-bottom: 14px;
+      opacity: 0;
+      transform: translateY(20px);
+      animation: slideUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.45s forwards;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .tg-card::before {
+      content: '';
+      position: absolute;
+      top: -40px;
+      right: -40px;
+      width: 140px;
+      height: 140px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(249,115,22,0.12), transparent 70%);
+      pointer-events: none;
+    }
+
+    .tg-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+
+    .tg-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, var(--amber), var(--crimson));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+      box-shadow: 0 4px 16px rgba(239,68,68,0.3);
+    }
+
+    .tg-info-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 2px;
+    }
+
+    .tg-info-sub {
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    .tg-desc {
+      font-size: 12px;
+      color: var(--text-mid);
+      line-height: 1.6;
+      margin-bottom: 16px;
+    }
+
+    .tg-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      padding: 13px;
+      border-radius: 12px;
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 13px;
+      letter-spacing: 0.3px;
+      text-decoration: none;
+      color: #fff;
+      background: linear-gradient(90deg, #F59E0B, #F97316);
+      border: none;
+      transition: all 0.25s ease;
+      box-shadow: 0 4px 20px rgba(245,158,11,0.3);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .tg-btn::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.15) 50%, transparent 60%);
+      background-size: 200% 100%;
+      animation: shimmer 3s ease-in-out infinite;
+    }
+
+    .tg-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 28px rgba(245,158,11,0.45);
+    }
+
+    /* ── Footer ── */
+    .footer {
+      width: 100%;
+      max-width: 420px;
+      text-align: center;
+      opacity: 0;
+      animation: fadeIn 0.6s ease 0.8s forwards;
+    }
+
+    .footer-inner {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      margin-bottom: 10px;
+    }
+
+    .footer-dot {
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: var(--border);
+    }
+
+    .footer p {
+      font-size: 10px;
+      color: var(--text-dim);
+      letter-spacing: 0.3px;
+    }
+
+    .footer-tags {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .footer-tag {
+      font-size: 10px;
+      color: var(--text-dim);
+      background: var(--elevated);
+      border: 1px solid var(--border);
+      padding: 3px 10px;
+      border-radius: 100px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .footer-tag i { font-size: 8px; color: var(--coral); }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: #10B981;
+      color: #fff;
+      font-family: 'Syne', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 12px 22px;
+      border-radius: 100px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 8px 32px rgba(16,185,129,0.4);
+      z-index: 999;
+      transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    #toast.show { transform: translateX(-50%) translateY(0); }
+
+    /* ── Animations ── */
+    @keyframes slideDown {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes slideUp {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes fadeIn {
+      to { opacity: 1; }
+    }
+
+    /* ── Success state ── */
+    .ring-inner.success #ring-num {
+      background: linear-gradient(135deg, #10B981, #34D399);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .orbit-dot.done { animation: none; }
+  </style>
+</head>
+<body>
+  <div class="page-wrap">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="logo">Love<span>ToRide</span></div>
+      <div class="secure-badge">
+        <i class="fas fa-circle"></i>
+        Secure Transfer
+      </div>
+    </div>
+
+    <!-- Main Card -->
+    <div class="main-card">
+      <div class="card-stripe"></div>
+      <div class="card-body">
+
+        <!-- File Header -->
+        <div class="file-header">
+          <div class="file-icon-wrap">
+            <div class="file-icon">📄</div>
+            <div class="file-icon-lock"><i class="fas fa-lock"></i></div>
+          </div>
+          <div class="file-meta">
+            <div class="file-label">Ready for Download</div>
+            <div class="file-name">Peddi (2026) Tamil (DS4K 1080p NF WEB Rip E AC3 5 @MoviiWrld.mkv</div>
+            <div class="file-enc">
+              <i class="fas fa-shield-alt"></i>
+              End-to-end encrypted
+            </div>
+          </div>
+        </div>
+
+        <!-- Ring Countdown -->
+        <div class="decrypt-ring">
+          <div class="ring-container">
+            <svg class="ring-svg" viewBox="0 0 110 110">
+              <defs>
+                <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stop-color="#F59E0B"/>
+                  <stop offset="50%" stop-color="#F97316"/>
+                  <stop offset="100%" stop-color="#EF4444"/>
+                </linearGradient>
+              </defs>
+              <circle class="ring-track" cx="55" cy="55" r="47.5"/>
+              <circle class="ring-fill" id="ring-path" cx="55" cy="55" r="47.5"/>
+            </svg>
+            <div class="orbit-dot" id="orbit-dot"></div>
+            <div class="ring-inner" id="ring-inner">
+              <div id="ring-num">5</div>
+              <div class="ring-label">seconds</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Steps -->
+        <div class="steps">
+          <div class="step active" id="step-1">
+            <div class="step-icon"><i class="fas fa-key"></i></div>
+            <div class="step-txt">Decrypt</div>
+          </div>
+          <div class="step" id="step-2">
+            <div class="step-icon"><i class="fas fa-check-double"></i></div>
+            <div class="step-txt">Verify</div>
+          </div>
+          <div class="step" id="step-3">
+            <div class="step-icon"><i class="fas fa-bolt"></i></div>
+            <div class="step-txt">Ready</div>
+          </div>
+        </div>
+
+        <!-- Download Button -->
+        <button id="download-btn" disabled>
+          <i class="fas fa-lock" id="btn-icon"></i>
+          <span id="btn-text">Decrypting File...</span>
+        </button>
+
+      </div>
+    </div>
+
+    <!-- Telegram Channel Card -->
+    <div class="tg-card">
+      <div class="tg-row">
+        <div class="tg-icon"><i class="fas fa-film"></i></div>
+        <div>
+          <div class="tg-info-title">Hollywood Tamil Dubbed</div>
+          <div class="tg-info-sub">Exclusive Content Channel</div>
+        </div>
+      </div>
+      <p class="tg-desc">Get the latest Hollywood blockbusters dubbed in Tamil — HD quality, updated daily. Join 50k+ members.</p>
+      <a href="https://t.me/+6eWQ0W8Q5xEyMDM0" class="tg-btn" target="_blank">
+        <i class="fab fa-telegram-plane"></i>
+        Join Channel — Free
+      </a>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <div class="footer-tags">
+        <div class="footer-tag"><i class="fas fa-bolt"></i> Fast Transfer</div>
+        <div class="footer-tag"><i class="fas fa-shield-alt"></i> Encrypted</div>
+        <div class="footer-tag"><i class="fas fa-infinity"></i> No Limits</div>
+      </div>
+      <p>© 2025 LoveToRide. Premium Secure File Transfer.</p>
+    </div>
+
+  </div>
+
+  <!-- Toast -->
+  <div id="toast">
+    <i class="fas fa-check-circle"></i>
+    File ready — starting download!
+  </div>
+
+  <script>
+    const TOTAL = 5;
+    let remaining = TOTAL;
+
+    const ringPath    = document.getElementById('ring-path');
+    const ringNum     = document.getElementById('ring-num');
+    const ringInner   = document.getElementById('ring-inner');
+    const orbitDot    = document.getElementById('orbit-dot');
+    const downloadBtn = document.getElementById('download-btn');
+    const btnIcon     = document.getElementById('btn-icon');
+    const btnText     = document.getElementById('btn-text');
+    const step1       = document.getElementById('step-1');
+    const step2       = document.getElementById('step-2');
+    const step3       = document.getElementById('step-3');
+    const toast       = document.getElementById('toast');
+
+    const CIRCUMFERENCE = 2 * Math.PI * 47.5; // ~298.45
+
+    function setRing(progress) {
+      // progress 0→1 fills the ring
+      ringPath.style.strokeDashoffset = CIRCUMFERENCE * (1 - progress);
+    }
+
+    // Tick every second
+    const interval = setInterval(() => {
+      remaining--;
+
+      const progress = (TOTAL - remaining) / TOTAL;
+      setRing(progress);
+      ringNum.textContent = remaining > 0 ? remaining : '✓';
+
+      // Step transitions
+      if (remaining === 3) {
+        step1.classList.remove('active');
+        step1.classList.add('done');
+        step1.querySelector('.step-icon i').className = 'fas fa-check';
+        step2.classList.add('active');
+      }
+      if (remaining === 1) {
+        step2.classList.remove('active');
+        step2.classList.add('done');
+        step2.querySelector('.step-icon i').className = 'fas fa-check';
+        step3.classList.add('active');
+      }
+
+      if (remaining <= 0) {
+        clearInterval(interval);
+
+        // Step 3 done
+        step3.classList.remove('active');
+        step3.classList.add('done');
+        step3.querySelector('.step-icon i').className = 'fas fa-check';
+
+        // Stop orbit
+        orbitDot.classList.add('done');
+
+        // Ring label tweak
+        ringInner.querySelector('.ring-label').textContent = 'ready';
+        ringNum.style.fontSize = '22px';
+
+        // Activate button
+        btnIcon.className = 'fas fa-download';
+        btnText.textContent = 'Download Now';
+        downloadBtn.removeAttribute('disabled');
+        downloadBtn.classList.add('ready');
+        downloadBtn.onclick = () => {
+          toast.classList.add('show');
+          setTimeout(() => { window.location.href = 'https://telegram.tglink.space/get_temp_link?url=https://telegram.tglink.space/watch/5333693/Peddi+%282026%29+Tamil+%28DS4K+1080p+NF+WEB+Rip+E+AC3+5+%40MoviiWrld.mkv?hash=AgADOA'; }, 800);
+        };
+      }
+    }, 1000);
+
+    // Set initial ring (empty)
+    setRing(0);
+  </script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a297cb582ac68151',t:'MTc4NjQ1NzExNw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"2a620f6e176e4103b7bbc76c7b919ca8","r":1}' crossorigin="anonymous"></script>
+</body>
+</html>
