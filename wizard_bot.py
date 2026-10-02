@@ -1,8 +1,16 @@
-﻿import asyncio
+import asyncio
 import os
 import re
+import sys
+
+# Pyrogram needs an event loop at import time (fails on Python 3.14 otherwise)
+try:
+    asyncio.get_event_loop()
+except RuntimeError:
+    asyncio.set_event_loop(asyncio.new_event_loop())
+
 import aiohttp
-from pyrogram import Client, filters
+from pyrogram import Client, filters, idle
 from pyrogram.enums import ParseMode
 from motor.motor_asyncio import AsyncIOMotorClient
 
@@ -13,6 +21,11 @@ API_HASH = os.environ.get("API_HASH")
 MONGO_URI = os.environ.get("MONGO_URI")
 DATABASE_CHANNEL_ID = -1003975570574
 TMDB_API_KEY = os.environ.get("TMDB_API_KEY")
+
+missing = [k for k in ("BOT_TOKEN", "API_ID", "API_HASH", "MONGO_URI", "TMDB_API_KEY") if not os.environ.get(k)]
+if missing:
+    print(f"❌ Wizard Bot: missing environment variables: {', '.join(missing)}", flush=True)
+    sys.exit(1)
 
 # Initialize Clients
 app = Client("wizard_bot", bot_token=BOT_TOKEN, api_id=API_ID, api_hash=API_HASH)
@@ -237,6 +250,18 @@ async def finish_wizard(client, message, state):
     except Exception as e:
         await msg.edit_text(f"❌ Error during upload: {e}\n\nMake sure I am added as an Admin in your Database Channel (-1003975570574) so I can post files!")
 
+@app.on_message(filters.private, group=-1)
+async def _log_updates(client, message):
+    print(f"📩 Update from {message.from_user.id if message.from_user else '?'}: {(message.text or message.caption or '<media>')[:40]}", flush=True)
+    message.continue_propagation()
+
+async def main():
+    await app.start()
+    me = await app.get_me()
+    print(f"✅ Wizard Bot online as @{me.username} (id {me.id})", flush=True)
+    await idle()
+    await app.stop()
+
 if __name__ == "__main__":
-    print("Wizard Bot is starting with TMDB integration...")
-    app.run()
+    print("Wizard Bot is starting with TMDB integration...", flush=True)
+    app.run(main())

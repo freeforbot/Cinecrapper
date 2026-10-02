@@ -1,5 +1,5 @@
 #!/bin/bash
-echo "🚀 Starting CineScraper Unified Worker..."
+echo "🚀 Starting CineScraper Unified Worker... ($(python --version))"
 
 # Wizard bot: started ONCE in its own restart loop (never duplicated)
 (
