@@ -14,6 +14,8 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 import aiohttp
 from pymongo import ReturnDocument
 from pyrogram import Client, filters, idle
+from pyrogram.enums import ChatMemberStatus
+from pyrogram.types import BotCommand
 import pyrogram.utils as _pg_utils
 
 # Pyrogram 2.0.106 rejects channel IDs above 2^31 ("Peer id invalid"). New channels
@@ -141,9 +143,61 @@ async def search_tmdb(query):
                     }
     return None
 
+MENU_TEXT = (
+    "📋 **Bot Menu**\n\n"
+    "/start - Check bot status & database channel access\n"
+    "/menu - Show all commands\n"
+    "/addmovie - Add a new movie (poster + files)\n"
+    "/add [number] - Add extra files to an existing movie\n"
+    "/list - List all movies with their numbers\n"
+    "/done - Finish sending files\n"
+    "/cancel - Cancel the current action"
+)
+
+BOT_COMMANDS = [
+    BotCommand("start", "Check bot & channel access"),
+    BotCommand("menu", "Show all commands"),
+    BotCommand("addmovie", "Add a new movie"),
+    BotCommand("add", "Add extra files: /add [number]"),
+    BotCommand("list", "List all movies with numbers"),
+    BotCommand("done", "Finish sending files"),
+    BotCommand("cancel", "Cancel current action"),
+]
+
+async def check_channel_access(client):
+    """Returns a status text about the bot's access to the database channel."""
+    ok = await ensure_channel(client)
+    if not ok:
+        return (f"❌ **Database channel: NO ACCESS**\n`{DATABASE_CHANNEL_ID}`\n\n"
+                f"Reason: {LAST_CHANNEL_ERROR}\n\n"
+                "Fix: add me as an **Admin** of the channel (with Post Messages), then post any message in the channel and send /start again.")
+    chat = await client.get_chat(DATABASE_CHANNEL_ID)
+    lines = [f"✅ **Database channel: ACCESS OK**\n📢 {chat.title}\n`{DATABASE_CHANNEL_ID}`"]
+    try:
+        me = await client.get_chat_member(DATABASE_CHANNEL_ID, "me")
+        if me.status == ChatMemberStatus.OWNER:
+            lines.append("👑 I am the owner - can post files")
+        elif me.status == ChatMemberStatus.ADMINISTRATOR:
+            can_post = getattr(me.privileges, "can_post_messages", None)
+            if can_post is False:
+                lines.append("⚠️ I am an admin but **cannot post messages** - enable 'Post Messages' for me")
+            else:
+                lines.append("🛡 I am an admin - can post files")
+        else:
+            lines.append("⚠️ I am **not an admin** in this channel - make me an admin so I can post files")
+    except Exception as e:
+        lines.append(f"⚠️ Could not read my admin rights: {e}")
+    return "\n".join(lines)
+
 @app.on_message(filters.command("start"))
 async def start_cmd(client, message):
-    await message.reply_text("👋 Hello! I am your Movie Upload Wizard.\n\nCommands:\n/addmovie - add a new movie (poster + files)\n/add <number> - add extra files to an existing movie\n/list - list all movies with their numbers\n/cancel - abort")
+    msg = await message.reply_text("👋 Hello! I am your **Movie Upload Wizard**.\n\n🔎 Checking database channel access...")
+    status = await check_channel_access(client)
+    await msg.edit_text("👋 Hello! I am your **Movie Upload Wizard**.\n\n" + status + "\n\nSend /menu to see all commands.")
+
+@app.on_message(filters.command("menu"))
+async def menu_cmd(client, message):
+    await message.reply_text(MENU_TEXT)
 
 @app.on_message(filters.command("addmovie"))
 async def addmovie_cmd(client, message):
@@ -197,7 +251,7 @@ async def add_cmd(client, message):
     user_id = message.from_user.id
     args = message.command[1:]
     if not args or not args[0].lstrip("#").isdigit():
-        await message.reply_text("Usage: /add <movie number>\nExample: /add 5\n\nUse /list to see movie numbers.")
+        await message.reply_text("Usage: /add [number]\nExample: /add 5\n\nUse /list to see movie numbers.")
         return
     no = int(args[0].lstrip("#"))
     movie = await wizard_movies.find_one({"_id": no})
@@ -228,10 +282,10 @@ async def list_cmd(client, message):
             await message.reply_text(chunk)
             chunk = ""
         chunk += line + "\n"
-    chunk += "\nAdd more files: /add <number>"
+    chunk += "\nAdd more files: /add [number]"
     await message.reply_text(chunk)
 
-@app.on_message(filters.text & ~filters.command(["start", "addmovie", "add", "list", "cancel", "done"]))
+@app.on_message(filters.text & ~filters.command(["start", "menu", "addmovie", "add", "list", "cancel", "done"]))
 async def text_handler(client, message):
     user_id = message.from_user.id
     if user_id not in WIZARD_STATE:
@@ -374,7 +428,10 @@ async def _load_peer():
     if doc:
         await app.storage.update_peers([(DATABASE_CHANNEL_ID, doc["access_hash"], "channel", None, None)])
 
+LAST_CHANNEL_ERROR = ""
+
 async def ensure_channel(client):
+    global LAST_CHANNEL_ERROR
     for attempt in (1, 2):
         try:
             chat = await client.get_chat(DATABASE_CHANNEL_ID)
@@ -388,6 +445,7 @@ async def ensure_channel(client):
                     continue
                 except Exception:
                     pass
+            LAST_CHANNEL_ERROR = str(e)
             print(f"❌ Cannot access DB channel {DATABASE_CHANNEL_ID}: {e}\n"
                   f"   -> Make the bot an admin of the channel, then post any message in the channel once.", flush=True)
             return False
@@ -402,6 +460,10 @@ async def main():
     me = await app.get_me()
     print(f"✅ Wizard Bot online as @{me.username} (id {me.id})", flush=True)
     await ensure_channel(app)
+    try:
+        await app.set_bot_commands(BOT_COMMANDS)
+    except Exception as e:
+        print(f"⚠️ Could not set bot commands: {e}", flush=True)
     await idle()
     await app.stop()
 
