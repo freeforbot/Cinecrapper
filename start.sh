@@ -1,7 +1,13 @@
-#!/bin/bash
-echo "🚀 Starting Wizard Bot ($(python --version))"
+﻿#!/bin/bash
+echo "🚀 Starting CineScraper Unified Worker..."
+
 while true; do
-  python wizard_bot.py
-  echo "⚠️ Wizard bot exited. Restarting in 5 seconds..."
+  echo "🤖 Starting TMDB Wizard Bot..."
+  python wizard_bot.py &
+  
+  echo "🎬 Starting CineScraper Userbot..."
+  python cinescraper.py
+  
+  echo "⚠️ Process exited. Restarting in 5 seconds..."
   sleep 5
 done
