@@ -21,7 +21,7 @@ BOT_TOKEN = os.environ.get("BOT_TOKEN")
 API_ID = int(os.environ.get("API_ID", "0"))
 API_HASH = os.environ.get("API_HASH")
 MONGO_URI = os.environ.get("MONGO_URI")
-DATABASE_CHANNEL_ID = -1003975570574
+DATABASE_CHANNEL_ID = int(os.environ.get("DATABASE_CHANNEL_ID", "-1003975570574"))
 TMDB_API_KEY = os.environ.get("TMDB_API_KEY")
 
 # Tiny web server so Render's web service sees an open port
@@ -222,6 +222,8 @@ async def finish_wizard(client, message, state):
     caption += f"\n🔍 **Search Tags:**\n{keywords}\n\n[@CinePrimeHub](https://t.me/+bTXW_3aYxlw3YWU1)"
     
     try:
+        # 0. Make sure the bot has resolved the DB channel (fresh sessions have an empty peer cache)
+        await ensure_channel(client)
         # 1. Send Poster to DB
         if tmdb.get("poster"):
             try:
@@ -268,17 +270,27 @@ async def finish_wizard(client, message, state):
             
         await msg.edit_text("✅ **Movie Successfully Added to Database!**\n\nThe poster and all files have been published to your Database Channel, and the database has been perfectly indexed! 🎉")
     except Exception as e:
-        await msg.edit_text(f"❌ Error during upload: {e}\n\nMake sure I am added as an Admin in your Database Channel (-1003975570574) so I can post files!")
+        await msg.edit_text(f"❌ Error during upload: {e}\n\nMake sure I am added as an Admin in your Database Channel ({DATABASE_CHANNEL_ID}) so I can post files!")
 
 @app.on_message(filters.private, group=-1)
 async def _log_updates(client, message):
     print(f"📩 Update from {message.from_user.id if message.from_user else '?'}: {(message.text or message.caption or '<media>')[:40]}", flush=True)
     message.continue_propagation()
 
+async def ensure_channel(client):
+    try:
+        chat = await client.get_chat(DATABASE_CHANNEL_ID)
+        print(f"✅ DB channel resolved: {chat.title}", flush=True)
+        return True
+    except Exception as e:
+        print(f"❌ Cannot access DB channel {DATABASE_CHANNEL_ID}: {e}", flush=True)
+        return False
+
 async def main():
     await app.start()
     me = await app.get_me()
     print(f"✅ Wizard Bot online as @{me.username} (id {me.id})", flush=True)
+    await ensure_channel(app)
     await idle()
     await app.stop()
 
