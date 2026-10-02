@@ -12,6 +12,7 @@ except RuntimeError:
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import aiohttp
+from pymongo import ReturnDocument
 from pyrogram import Client, filters, idle
 import pyrogram.utils as _pg_utils
 
@@ -57,6 +58,7 @@ app = Client("wizard_bot", bot_token=BOT_TOKEN, api_id=API_ID, api_hash=API_HASH
 db_client = AsyncIOMotorClient(MONGO_URI)
 db = db_client["cinesearch_db"]
 movies_col = db["movies"]
+wizard_movies = db["wizard_movies"]  # numbered movie registry (poster msg id, keywords, files)
 
 # State Machine
 WIZARD_STATE = {}
@@ -141,7 +143,7 @@ async def search_tmdb(query):
 
 @app.on_message(filters.command("start"))
 async def start_cmd(client, message):
-    await message.reply_text("👋 Hello! I am your Movie Upload Wizard.\n\nType /addmovie to begin the step-by-step upload process!")
+    await message.reply_text("👋 Hello! I am your Movie Upload Wizard.\n\nCommands:\n/addmovie - add a new movie (poster + files)\n/add <number> - add extra files to an existing movie\n/list - list all movies with their numbers\n/cancel - abort")
 
 @app.on_message(filters.command("addmovie"))
 async def addmovie_cmd(client, message):
@@ -161,15 +163,75 @@ async def cancel_cmd(client, message):
 @app.on_message(filters.command("done"))
 async def done_cmd(client, message):
     user_id = message.from_user.id
-    if user_id in WIZARD_STATE and WIZARD_STATE[user_id]["step"] == "awaiting_files":
-        if not WIZARD_STATE[user_id]["files"]:
+    st = WIZARD_STATE.get(user_id)
+    if not st:
+        return
+
+    if st["step"] == "awaiting_files":
+        if not st["files"]:
             await message.reply_text("❌ You haven't sent any files! Send movie files or type /cancel.")
             return
-            
-        WIZARD_STATE[user_id]["step"] = "awaiting_keywords"
+        st["step"] = "awaiting_keywords"
         await message.reply_text("✅ Files received! Now, please reply with the **Search Keywords / Tags** for this movie.\n\nExample: iron man, ironman 1")
 
-@app.on_message(filters.text & ~filters.command(["start", "addmovie", "cancel", "done"]))
+    elif st["step"] == "adding_files":
+        if not st["files"]:
+            await message.reply_text("❌ You haven't sent any files! Send the extra files or type /cancel.")
+            return
+        no = st["movie_no"]
+        del WIZARD_STATE[user_id]
+        msg = await message.reply_text(f"🔄 Uploading {len(st['files'])} file(s) to movie #{no}...")
+        try:
+            movie = await wizard_movies.find_one({"_id": no})
+            await ensure_channel(client)
+            before = len(movie["files"])
+            names = await upload_files(client, st["files"], movie["keywords"], movie["poster_msg_id"])
+            await wizard_movies.update_one({"_id": no}, {"$push": {"files": {"$each": names}}})
+            total = before + len(names)
+            await msg.edit_text(f"✅ **Added {len(names)} file(s) to movie #{no}**\n🎬 {movie['title']}\n📁 Total files: {total}")
+        except Exception as e:
+            await msg.edit_text(f"❌ Error while adding files: {e}")
+
+@app.on_message(filters.command("add"))
+async def add_cmd(client, message):
+    user_id = message.from_user.id
+    args = message.command[1:]
+    if not args or not args[0].lstrip("#").isdigit():
+        await message.reply_text("Usage: /add <movie number>\nExample: /add 5\n\nUse /list to see movie numbers.")
+        return
+    no = int(args[0].lstrip("#"))
+    movie = await wizard_movies.find_one({"_id": no})
+    if not movie:
+        await message.reply_text(f"❌ No movie with number #{no}. Use /list to see all movies.")
+        return
+    WIZARD_STATE[user_id] = {"step": "adding_files", "movie_no": no, "files": []}
+    caption = (f"🎬 **#{no} — {movie['title']}**\n📁 Files so far: {len(movie['files'])}\n\n"
+               f"Send the extra files now. When finished, type /done.\nType /cancel to abort.")
+    if movie.get("poster"):
+        try:
+            await message.reply_photo(photo=movie["poster"], caption=caption)
+            return
+        except Exception:
+            pass
+    await message.reply_text(caption)
+
+@app.on_message(filters.command("list"))
+async def list_cmd(client, message):
+    movies = await wizard_movies.find({}).sort("_id", 1).to_list(length=None)
+    if not movies:
+        await message.reply_text("No movies added yet. Use /addmovie to add one.")
+        return
+    lines = [f"#{m['_id']} — {m['title']} ({len(m['files'])} files)" for m in movies]
+    chunk = "🎞 **Movies in database:**\n\n"
+    for line in lines:
+        if len(chunk) + len(line) > 3800:
+            await message.reply_text(chunk)
+            chunk = ""
+        chunk += line + "\n"
+    chunk += "\nAdd more files: /add <number>"
+    await message.reply_text(chunk)
+
+@app.on_message(filters.text & ~filters.command(["start", "addmovie", "add", "list", "cancel", "done"]))
 async def text_handler(client, message):
     user_id = message.from_user.id
     if user_id not in WIZARD_STATE:
@@ -210,9 +272,45 @@ async def text_handler(client, message):
 @app.on_message(filters.document | filters.video)
 async def file_handler(client, message):
     user_id = message.from_user.id
-    if user_id in WIZARD_STATE and WIZARD_STATE[user_id]["step"] == "awaiting_files":
+    if user_id in WIZARD_STATE and WIZARD_STATE[user_id]["step"] in ("awaiting_files", "adding_files"):
         WIZARD_STATE[user_id]["files"].append(message)
         await message.reply_text("✅ File added to wizard! Send more, or type /done.")
+
+async def upload_files(client, files, keywords, poster_msg_id):
+    """Copy files into the DB channel as replies to the poster; index names in Mongo."""
+    names = []
+    for f_msg in files:
+        doc = f_msg.document or f_msg.video
+        file_name = getattr(doc, 'file_name', None) or "Unknown_Movie.mkv"
+
+        # Clean filename
+        file_name = re.sub(r'@[a-zA-Z0-9_]+', '', file_name)
+        file_name = re.sub(r'(?i)CharmeLeon', '', file_name)
+        if ' - ' in file_name:
+            parts = file_name.rsplit(' - ', 1)
+            ext = ''
+            if '.' in parts[1]:
+                ext = '.' + parts[1].rsplit('.', 1)[-1]
+            file_name = parts[0] + ext
+        file_name = file_name.strip()
+        if not file_name.endswith(('.mkv', '.mp4', '.avi')):
+            file_name += ".mkv"
+
+        file_size = getattr(doc, 'file_size', 0)
+        file_caption = generate_beautiful_caption(file_name, file_size)
+        file_caption = file_caption.replace("[@CinePrimeHub]", f"🔍 **Search Tags:**\n{keywords}\n\n[@CinePrimeHub]")
+
+        await client.copy_message(
+            chat_id=DATABASE_CHANNEL_ID,
+            from_chat_id=f_msg.chat.id,
+            message_id=f_msg.id,
+            caption=file_caption,
+            reply_to_message_id=poster_msg_id
+        )
+        await movies_col.insert_one({"file_name": file_name})
+        names.append(file_name)
+        await asyncio.sleep(1)
+    return names
 
 async def finish_wizard(client, message, state):
     msg = await message.reply_text("🔄 Compiling and uploading everything to the Database Channel...")
@@ -239,41 +337,19 @@ async def finish_wizard(client, message, state):
             poster_msg = await client.send_message(DATABASE_CHANNEL_ID, caption)
             
         # 2. Copy files as replies to the poster
-        for f_msg in state["files"]:
-            doc = f_msg.document or f_msg.video
-            file_name = getattr(doc, 'file_name', None) or "Unknown_Movie.mkv"
-            
-            # Clean filename
-            file_name = re.sub(r'@[a-zA-Z0-9_]+', '', file_name)
-            file_name = re.sub(r'(?i)CharmeLeon', '', file_name)
-            if ' - ' in file_name:
-                parts = file_name.rsplit(' - ', 1)
-                ext = ''
-                if '.' in parts[1]:
-                    ext = '.' + parts[1].rsplit('.', 1)[-1]
-                file_name = parts[0] + ext
-            file_name = file_name.strip()
-            if not file_name.endswith(('.mkv', '.mp4', '.avi')):
-                file_name += ".mkv"
-                
-            file_size = getattr(doc, 'file_size', 0)
-            
-            file_caption = generate_beautiful_caption(file_name, file_size)
-            file_caption = file_caption.replace("[@CinePrimeHub]", f"🔍 **Search Tags:**\n{keywords}\n\n[@CinePrimeHub]")
-            
-            await client.copy_message(
-                chat_id=DATABASE_CHANNEL_ID,
-                from_chat_id=f_msg.chat.id,
-                message_id=f_msg.id,
-                caption=file_caption,
-                reply_to_message_id=poster_msg.id
-            )
-            
-            # Save to Mongo
-            await movies_col.insert_one({"file_name": file_name})
-            await asyncio.sleep(1)
-            
-        await msg.edit_text("✅ **Movie Successfully Added to Database!**\n\nThe poster and all files have been published to your Database Channel, and the database has been perfectly indexed! 🎉")
+        names = await upload_files(client, state["files"], keywords, poster_msg.id)
+
+        # 3. Register the movie with a number
+        seq = await state_col.find_one_and_update(
+            {"_id": "movie_counter"}, {"$inc": {"seq": 1}}, upsert=True, return_document=ReturnDocument.AFTER)
+        movie_no = seq["seq"]
+        await wizard_movies.insert_one({
+            "_id": movie_no, "title": tmdb["title"], "keywords": keywords,
+            "poster_msg_id": poster_msg.id, "poster": tmdb.get("poster"), "files": names})
+
+        await msg.edit_text(
+            f"✅ **Movie Successfully Added!**\n\n🔢 **Movie No: #{movie_no}**\n🎬 {tmdb['title']}\n📁 Files: {len(names)}\n\n"
+            f"Add more files later: `/add {movie_no}`\nSee all movies: /list")
     except Exception as e:
         await msg.edit_text(f"❌ Error during upload: {e}\n\nMake sure I am added as an Admin in your Database Channel ({DATABASE_CHANNEL_ID}) so I can post files!")
 
