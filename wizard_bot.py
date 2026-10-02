@@ -13,6 +13,11 @@ import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import aiohttp
 from pyrogram import Client, filters, idle
+import pyrogram.utils as _pg_utils
+
+# Pyrogram 2.0.106 rejects channel IDs above 2^31 ("Peer id invalid"). New channels
+# have bigger IDs (e.g. -1003975570574), so widen the allowed range.
+_pg_utils.MIN_CHANNEL_ID = -1007852516352
 from pyrogram.enums import ParseMode
 from motor.motor_asyncio import AsyncIOMotorClient
 
@@ -277,14 +282,44 @@ async def _log_updates(client, message):
     print(f"📩 Update from {message.from_user.id if message.from_user else '?'}: {(message.text or message.caption or '<media>')[:40]}", flush=True)
     message.continue_propagation()
 
-async def ensure_channel(client):
+state_col = db["bot_state"]
+
+async def _save_peer():
     try:
-        chat = await client.get_chat(DATABASE_CHANNEL_ID)
-        print(f"✅ DB channel resolved: {chat.title}", flush=True)
-        return True
+        peer = await app.storage.get_peer_by_id(DATABASE_CHANNEL_ID)
+        await state_col.update_one(
+            {"_id": f"peer_{DATABASE_CHANNEL_ID}"},
+            {"$set": {"access_hash": peer.access_hash}}, upsert=True)
     except Exception as e:
-        print(f"❌ Cannot access DB channel {DATABASE_CHANNEL_ID}: {e}", flush=True)
-        return False
+        print(f"⚠️ Could not cache channel access: {e}", flush=True)
+
+async def _load_peer():
+    doc = await state_col.find_one({"_id": f"peer_{DATABASE_CHANNEL_ID}"})
+    if doc:
+        await app.storage.update_peers([(DATABASE_CHANNEL_ID, doc["access_hash"], "channel", None, None)])
+
+async def ensure_channel(client):
+    for attempt in (1, 2):
+        try:
+            chat = await client.get_chat(DATABASE_CHANNEL_ID)
+            print(f"✅ DB channel resolved: {chat.title}", flush=True)
+            await _save_peer()
+            return True
+        except Exception as e:
+            if attempt == 1:
+                try:
+                    await _load_peer()
+                    continue
+                except Exception:
+                    pass
+            print(f"❌ Cannot access DB channel {DATABASE_CHANNEL_ID}: {e}\n"
+                  f"   -> Make the bot an admin of the channel, then post any message in the channel once.", flush=True)
+            return False
+
+@app.on_message(filters.chat(DATABASE_CHANNEL_ID), group=-2)
+async def _seen_channel(client, message):
+    await _save_peer()
+    message.continue_propagation()
 
 async def main():
     await app.start()
