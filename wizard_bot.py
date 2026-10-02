@@ -15,7 +15,7 @@ import aiohttp
 import random
 import datetime
 from pyrogram import Client, filters, idle
-from pyrogram.enums import ChatMemberStatus
+from pyrogram.enums import ChatMemberStatus, ParseMode
 from pyrogram.types import BotCommand
 import pyrogram.utils as _pg_utils
 
@@ -227,7 +227,7 @@ async def done_cmd(client, message):
             await message.reply_text("❌ You haven't sent any files! Send movie files or type /cancel.")
             return
         st["step"] = "awaiting_keywords"
-        await message.reply_text("✅ Files received! Now, please reply with the **Search Keywords / Tags** for this movie.\n\nExample: iron man, ironman 1")
+        await message.reply_text("✅ Files received! Now, please reply with the **caption** for these files.\n\nI will put exactly your text as the caption on every file (nothing added), and it is also used for search.\n\nExample: iron man, ironman 1")
 
     elif st["step"] == "adding_files":
         if not st["files"]:
@@ -363,14 +363,15 @@ async def upload_files(client, files, keywords, poster_msg_id):
             file_name += ".mkv"
 
         file_size = getattr(doc, 'file_size', 0)
-        file_caption = generate_beautiful_caption(file_name, file_size)
-        file_caption = file_caption.replace("[@CinePrimeHub]", f"🔍 **Search Tags:**\n{keywords}\n\n[@CinePrimeHub]")
+        # Caption = exactly what the user typed (Telegram caption limit is 1024 chars)
+        file_caption = keywords[:1024]
 
         await client.copy_message(
             chat_id=DATABASE_CHANNEL_ID,
             from_chat_id=f_msg.chat.id,
             message_id=f_msg.id,
             caption=file_caption,
+            parse_mode=ParseMode.DISABLED,
             reply_to_message_id=poster_msg_id
         )
         await movies_col.insert_one({"file_name": file_name})
