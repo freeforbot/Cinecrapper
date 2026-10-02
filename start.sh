@@ -1,4 +1,4 @@
-﻿#!/bin/bash
+#!/bin/bash
 echo "🚀 Starting CineScraper Unified Worker..."
 
 while true; do
