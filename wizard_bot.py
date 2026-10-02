@@ -12,7 +12,8 @@ except RuntimeError:
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import aiohttp
-from pymongo import ReturnDocument
+import random
+import datetime
 from pyrogram import Client, filters, idle
 from pyrogram.enums import ChatMemberStatus
 from pyrogram.types import BotCommand
@@ -148,8 +149,8 @@ MENU_TEXT = (
     "/start - Check bot status & database channel access\n"
     "/menu - Show all commands\n"
     "/addmovie - Add a new movie (poster + files)\n"
-    "/add [number] - Add extra files to an existing movie\n"
-    "/list - List all movies with their numbers\n"
+    "/add [code] - Add extra files to a movie\n"
+    "/list - List all movies with their codes\n"
     "/done - Finish sending files\n"
     "/cancel - Cancel the current action"
 )
@@ -158,8 +159,8 @@ BOT_COMMANDS = [
     BotCommand("start", "Check bot & channel access"),
     BotCommand("menu", "Show all commands"),
     BotCommand("addmovie", "Add a new movie"),
-    BotCommand("add", "Add extra files: /add [number]"),
-    BotCommand("list", "List all movies with numbers"),
+    BotCommand("add", "Add extra files: /add [code]"),
+    BotCommand("list", "List all movies with codes"),
     BotCommand("done", "Finish sending files"),
     BotCommand("cancel", "Cancel current action"),
 ]
@@ -234,7 +235,7 @@ async def done_cmd(client, message):
             return
         no = st["movie_no"]
         del WIZARD_STATE[user_id]
-        msg = await message.reply_text(f"🔄 Uploading {len(st['files'])} file(s) to movie #{no}...")
+        msg = await message.reply_text(f"🔄 Uploading {len(st['files'])} file(s) to movie {no}...")
         try:
             movie = await wizard_movies.find_one({"_id": no})
             await ensure_channel(client)
@@ -242,7 +243,7 @@ async def done_cmd(client, message):
             names = await upload_files(client, st["files"], movie["keywords"], movie["poster_msg_id"])
             await wizard_movies.update_one({"_id": no}, {"$push": {"files": {"$each": names}}})
             total = before + len(names)
-            await msg.edit_text(f"✅ **Added {len(names)} file(s) to movie #{no}**\n🎬 {movie['title']}\n📁 Total files: {total}")
+            await msg.edit_text(f"✅ **Added {len(names)} file(s)**\n🎬 {movie['title']}\n🔢 Code: `{no}`\n📁 Total files: {total}")
         except Exception as e:
             await msg.edit_text(f"❌ Error while adding files: {e}")
 
@@ -251,15 +252,15 @@ async def add_cmd(client, message):
     user_id = message.from_user.id
     args = message.command[1:]
     if not args or not args[0].lstrip("#").isdigit():
-        await message.reply_text("Usage: /add [number]\nExample: /add 5\n\nUse /list to see movie numbers.")
+        await message.reply_text("Usage: /add [movie code]\nExample: /add 48213\n\nUse /list to see movie codes.")
         return
     no = int(args[0].lstrip("#"))
     movie = await wizard_movies.find_one({"_id": no})
     if not movie:
-        await message.reply_text(f"❌ No movie with number #{no}. Use /list to see all movies.")
+        await message.reply_text(f"❌ No movie with code {no}. Use /list to see all movies.")
         return
     WIZARD_STATE[user_id] = {"step": "adding_files", "movie_no": no, "files": []}
-    caption = (f"🎬 **#{no} — {movie['title']}**\n📁 Files so far: {len(movie['files'])}\n\n"
+    caption = (f"🎬 **{movie['title']}**\n🔢 Code: `{no}`\n📁 Files so far: {len(movie['files'])}\n\n"
                f"Send the extra files now. When finished, type /done.\nType /cancel to abort.")
     if movie.get("poster"):
         try:
@@ -271,18 +272,21 @@ async def add_cmd(client, message):
 
 @app.on_message(filters.command("list"))
 async def list_cmd(client, message):
-    movies = await wizard_movies.find({}).sort("_id", 1).to_list(length=None)
+    query = " ".join(message.command[1:]).strip().lower()
+    movies = await wizard_movies.find({}).sort([("created", 1), ("_id", 1)]).to_list(length=None)
+    if query:
+        movies = [m for m in movies if query in m["title"].lower() or query in m.get("keywords", "").lower()]
     if not movies:
-        await message.reply_text("No movies added yet. Use /addmovie to add one.")
+        await message.reply_text("No movies found." if query else "No movies added yet. Use /addmovie to add one.")
         return
-    lines = [f"#{m['_id']} — {m['title']} ({len(m['files'])} files)" for m in movies]
-    chunk = "🎞 **Movies in database:**\n\n"
+    lines = [f"`{m['_id']}` — {m['title']} ({len(m['files'])} files)" for m in movies]
+    chunk = f"🎞 **Movies ({len(movies)}):**\n\n"
     for line in lines:
         if len(chunk) + len(line) > 3800:
             await message.reply_text(chunk)
             chunk = ""
         chunk += line + "\n"
-    chunk += "\nAdd more files: /add [number]"
+    chunk += "\nTap a code to copy, then send: /add [code]\nSearch: /list [name]"
     await message.reply_text(chunk)
 
 @app.on_message(filters.text & ~filters.command(["start", "menu", "addmovie", "add", "list", "cancel", "done"]))
@@ -329,6 +333,14 @@ async def file_handler(client, message):
     if user_id in WIZARD_STATE and WIZARD_STATE[user_id]["step"] in ("awaiting_files", "adding_files"):
         WIZARD_STATE[user_id]["files"].append(message)
         await message.reply_text("✅ File added to wizard! Send more, or type /done.")
+
+async def new_movie_code():
+    """Unique fixed 5-digit code for a movie."""
+    for _ in range(100):
+        code = random.randint(10000, 99999)
+        if not await wizard_movies.find_one({"_id": code}):
+            return code
+    raise RuntimeError("No free 5-digit movie codes left")
 
 async def upload_files(client, files, keywords, poster_msg_id):
     """Copy files into the DB channel as replies to the poster; index names in Mongo."""
@@ -394,16 +406,15 @@ async def finish_wizard(client, message, state):
         names = await upload_files(client, state["files"], keywords, poster_msg.id)
 
         # 3. Register the movie with a number
-        seq = await state_col.find_one_and_update(
-            {"_id": "movie_counter"}, {"$inc": {"seq": 1}}, upsert=True, return_document=ReturnDocument.AFTER)
-        movie_no = seq["seq"]
+        movie_no = await new_movie_code()
         await wizard_movies.insert_one({
             "_id": movie_no, "title": tmdb["title"], "keywords": keywords,
-            "poster_msg_id": poster_msg.id, "poster": tmdb.get("poster"), "files": names})
+            "poster_msg_id": poster_msg.id, "poster": tmdb.get("poster"), "files": names,
+            "created": datetime.datetime.utcnow()})
 
         await msg.edit_text(
-            f"✅ **Movie Successfully Added!**\n\n🔢 **Movie No: #{movie_no}**\n🎬 {tmdb['title']}\n📁 Files: {len(names)}\n\n"
-            f"Add more files later: `/add {movie_no}`\nSee all movies: /list")
+            f"✅ **Movie Successfully Added!**\n\n🎬 **{tmdb['title']}**\n🔢 **Movie Code:** `{movie_no}`\n📁 Files: {len(names)}\n\n"
+            f"To add more files later send:\n`/add {movie_no}`\n\nSee all movies: /list")
     except Exception as e:
         await msg.edit_text(f"❌ Error during upload: {e}\n\nMake sure I am added as an Admin in your Database Channel ({DATABASE_CHANNEL_ID}) so I can post files!")
 
@@ -455,10 +466,24 @@ async def _seen_channel(client, message):
     await _save_peer()
     message.continue_propagation()
 
+async def migrate_legacy_codes():
+    async for m in wizard_movies.find({"_id": {"$lt": 10000}}):
+        code = await new_movie_code()
+        old = m["_id"]
+        m["_id"] = code
+        m.setdefault("created", datetime.datetime.utcnow())
+        await wizard_movies.insert_one(m)
+        await wizard_movies.delete_one({"_id": old})
+        print(f"🔁 Movie {old} -> code {code} ({m['title']})", flush=True)
+
 async def main():
     await app.start()
     me = await app.get_me()
     print(f"✅ Wizard Bot online as @{me.username} (id {me.id})", flush=True)
+    try:
+        await migrate_legacy_codes()
+    except Exception as e:
+        print(f"⚠️ Code migration skipped: {e}", flush=True)
     await ensure_channel(app)
     try:
         await app.set_bot_commands(BOT_COMMANDS)
