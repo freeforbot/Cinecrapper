@@ -1261,7 +1261,7 @@ async def forward_worker():
                 )
                 
             # Update DB so we know we have it
-            await movies_col.insert_one({"file_name": file_name})
+            await movies_col.update_one({"file_name": file_name}, {"": {"file_name": file_name}}, upsert=True)
             
             # 2. Forward to Control Room (chat_id) for visual feedback
             if chat_id != DATABASE_CHANNEL_ID:
