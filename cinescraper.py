@@ -288,19 +288,32 @@ async def scan_channel_history(client, message):
                     import re
                     file_name = re.sub(r'@[a-zA-Z0-9_]+', '', file_name).strip()
                     file_size = getattr(doc, 'file_size', 0)
+                    file_id_str = getattr(doc, 'file_id', "")
                     
                     beautiful_caption = generate_beautiful_caption(file_name, file_size)
                     
-                    # Save to MongoDB to prevent duplicates
-                    await movies_col.update_one({"file_name": file_name}, {"": {"file_name": file_name}}, upsert=True)
-                    
-                    # Copy to Database Channel
-                    await client.copy_message(
+                    # Copy to Database Channel FIRST to get the new message ID
+                    copied_msg = await client.copy_message(
                         chat_id=DATABASE_CHANNEL_ID,
                         from_chat_id=target_channel,
                         message_id=old_msg.id,
                         caption=beautiful_caption
                     )
+                    
+                    # Get the new file_id from the copied message (it might be different after copying)
+                    new_doc = copied_msg.document or copied_msg.video
+                    final_file_id = getattr(new_doc, 'file_id', file_id_str)
+                    
+                    # Save EVERYTHING to MongoDB so the AutoFilter bot can read it!
+                    db_entry = {
+                        "file_name": file_name,
+                        "file_id": final_file_id,
+                        "file_size": file_size,
+                        "source_chat_id": DATABASE_CHANNEL_ID,
+                        "source_message_id": copied_msg.id
+                    }
+                    await movies_col.update_one({"file_name": file_name}, {"$set": db_entry}, upsert=True)
+                    
                     count += 1
                     
                     # Sleep for 2.5 seconds to absolutely guarantee no FloodWait bans
@@ -312,7 +325,7 @@ async def scan_channel_history(client, message):
                 except Exception as e:
                     print(f"Error copying historical message: {e}")
                     
-        await status_msg.edit(f"✅ **Time Machine Scan Complete!**\n\nSuccessfully pulled **{count}** old movies from the channel, cleaned them, and indexed them into your database vault!")
+        await status_msg.edit(f"✅ **Time Machine Scan Complete!**\n\nSuccessfully pulled **{count}** old movies from the channel, cleaned them, and fully indexed them for the AutoFilter bot!")
     except Exception as e:
         await message.reply_text(f"❌ Error during scan: {e}")
 
@@ -1334,16 +1347,28 @@ async def forward_worker():
         client, chat_id, from_chat_id, msg_id, caption, file_name = await forward_queue.get()
         try:
             # 1. Forward directly to Database Channel to guarantee backup
-            await client.copy_message(
-                    chat_id=DATABASE_CHANNEL_ID,
-                    from_chat_id=from_chat_id,
-                    message_id=msg_id,
-                    caption=caption,
-                    parse_mode=ParseMode.MARKDOWN
-                )
+            copied_msg = await client.copy_message(
+                chat_id=DATABASE_CHANNEL_ID,
+                from_chat_id=from_chat_id,
+                message_id=msg_id,
+                caption=caption,
+                parse_mode=ParseMode.MARKDOWN
+            )
+            
+            # Extract file_id from the copied message
+            doc = copied_msg.document or copied_msg.video
+            final_file_id = getattr(doc, 'file_id', "")
+            file_size = getattr(doc, 'file_size', 0)
                 
-            # Update DB so we know we have it
-            await movies_col.update_one({"file_name": file_name}, {"": {"file_name": file_name}}, upsert=True)
+            # Update DB so we know we have it AND the AutoFilter bot has the file_id it needs!
+            db_entry = {
+                "file_name": file_name,
+                "file_id": final_file_id,
+                "file_size": file_size,
+                "source_chat_id": DATABASE_CHANNEL_ID,
+                "source_message_id": copied_msg.id
+            }
+            await movies_col.update_one({"file_name": file_name}, {"$set": db_entry}, upsert=True)
             
             # 2. Forward to Control Room (chat_id) for visual feedback
             if chat_id != DATABASE_CHANNEL_ID:
