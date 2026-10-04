@@ -251,11 +251,7 @@ async def logs_command(client, message):
         last_lines = "".join(lines[-30:])
         if not last_lines:
             last_lines = "No logs yet."
-        await message.reply_text(f"""📝 **Recent Logs:**
-
-`
-{last_lines}
-`""")
+        await message.reply_text(f"""📝 **Recent Logs:**\n\n`\n{last_lines}\n`""")
     except Exception as e:
         await message.reply_text(f"Error reading logs: {e}")
 
@@ -345,13 +341,9 @@ async def addchannel_command(client, message):
             
         await channels_col.update_one({"_id": channel_id}, {"": {"_id": channel_id}}, upsert=True)
         MONITORED_CHANNELS.add(channel_id)
-        await message.reply_text(f"✅ Successfully added {channel_id} to Auto-Monitor list!
-
-Any new movies posted in that channel will instantly be added to your database!")
+        await message.reply_text(f"✅ Successfully added {channel_id} to Auto-Monitor list!\n\nAny new movies posted in that channel will instantly be added to your database!")
     except Exception as e:
-        await message.reply_text(f"❌ Error adding channel: {e}
-
-Use: /addchannel @username or /addchannel -100xxx")
+        await message.reply_text(f"❌ Error adding channel: {e}\n\nUse: /addchannel @username or /addchannel -100xxx")
 
 
 
@@ -606,8 +598,7 @@ async def force_command(client, message):
         if not movie:
             raise ValueError()
         await queue_col.insert_one({"movie_name": movie, "status": "pending", "force": True, "is_urgent": True})
-        await message.reply_text(f"""✅ **Forced:** {movie}
-It has been urgently queued and will completely bypass the database check!""")
+        await message.reply_text(f"""✅ **Forced:** {movie}\nIt has been urgently queued and will completely bypass the database check!""")
     except Exception:
         await message.reply_text("⚠️ Usage: /force Movie Name 2024")
 
