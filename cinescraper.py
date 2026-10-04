@@ -340,61 +340,7 @@ Any new movies posted in that channel will instantly be added to your database!"
 
 Use: /addchannel @username or /addchannel -100xxx")
 
-@app.on_message(filters.chat(CONTROL_CHANNEL_ID) & filters.command("scan_channel", prefixes="/"))
-async def scan_channel_history(client, message):
-    import asyncio
-    try:
-        if len(message.command) < 2:
-            await message.reply_text("❌ Usage: /scan_channel @username or /scan_channel -100xxx")
-            return
-            
-        target_channel = message.command[1]
-        if target_channel.startswith("@"):
-            chat = await client.get_chat(target_channel)
-            target_channel = chat.id
-        else:
-            target_channel = int(target_channel)
-            
-        status_msg = await message.reply_text(f"⏳ **Starting Time Machine Scan** on {target_channel}...\n\nThis will slowly read from newest to oldest to avoid bans!")
-        
-        count = 0
-        DATABASE_CHANNEL_ID = -1003975570574
-        
-        async for old_msg in client.get_chat_history(target_channel):
-            if old_msg.document or old_msg.video:
-                try:
-                    doc = old_msg.document or old_msg.video
-                    file_name = getattr(doc, 'file_name', None) or "Unknown_Movie.mkv"
-                    import re
-                    file_name = re.sub(r'@[a-zA-Z0-9_]+', '', file_name).strip()
-                    file_size = getattr(doc, 'file_size', 0)
-                    
-                    beautiful_caption = generate_beautiful_caption(file_name, file_size)
-                    
-                    # Save to MongoDB to prevent duplicates
-                    await movies_col.update_one({"file_name": file_name}, {"": {"file_name": file_name}}, upsert=True)
-                    
-                    # Copy to Database Channel
-                    await client.copy_message(
-                        chat_id=DATABASE_CHANNEL_ID,
-                        from_chat_id=target_channel,
-                        message_id=old_msg.id,
-                        caption=beautiful_caption
-                    )
-                    count += 1
-                    
-                    # Sleep for 2.5 seconds to absolutely guarantee no FloodWait bans
-                    await asyncio.sleep(2.5)
-                    
-                    if count % 20 == 0:
-                        await status_msg.edit(f"⏳ **Scanning in progress...**\nIndexed {count} old movies so far...")
-                        
-                except Exception as e:
-                    print(f"Error copying historical message: {e}")
-                    
-        await status_msg.edit(f"✅ **Time Machine Scan Complete!**\n\nSuccessfully pulled **{count}** old movies from the channel, cleaned them, and indexed them into your database vault!")
-    except Exception as e:
-        await message.reply_text(f"❌ Error during scan: {e}")
+
 
 @app.on_message(filters.chat(CONTROL_CHANNEL_ID) & filters.command("start", prefixes="/"))
 async def start_command(client, message):
