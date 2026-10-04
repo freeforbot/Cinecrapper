@@ -261,6 +261,30 @@ async def logs_command(client, message):
 
 
 @app.on_message(filters.chat(CONTROL_CHANNEL_ID) & filters.command("start", prefixes="/"))
+@app.on_message(filters.chat(CONTROL_CHANNEL_ID) & filters.command("addchannel", prefixes="/"))
+async def addchannel_command(client, message):
+    global MONITORED_CHANNELS
+    try:
+        channel_id = message.text.split(" ", 1)[1].strip()
+        
+        # Try to resolve username to ID if it's a username
+        if channel_id.startswith("@"):
+            chat = await client.get_chat(channel_id)
+            channel_id = chat.id
+        else:
+            channel_id = int(channel_id)
+            
+        await channels_col.update_one({"_id": channel_id}, {"": {"_id": channel_id}}, upsert=True)
+        MONITORED_CHANNELS.add(channel_id)
+        await message.reply_text(f"✅ Successfully added {channel_id} to Auto-Monitor list!
+
+Any new movies posted in that channel will instantly be added to your database!")
+    except Exception as e:
+        await message.reply_text(f"❌ Error adding channel: {e}
+
+Use: /addchannel @username or /addchannel -100xxx")
+
+@app.on_message(filters.chat(CONTROL_CHANNEL_ID) & filters.command("start", prefixes="/"))
 async def start_command(client, message):
     await state_col.update_one(
         {"_id": "main_state"},
@@ -1281,6 +1305,36 @@ async def forward_worker():
         await asyncio.sleep(2) 
         forward_queue.task_done()
 
+
+@app.on_message((filters.document | filters.video), group=-1)
+async def auto_monitor_handler(client, message):
+    if not message.chat or message.chat.id not in MONITORED_CHANNELS:
+        return
+        
+    # It's a monitored channel! Process it!
+    try:
+        doc = message.document or message.video
+        file_name = getattr(doc, 'file_name', None) or "Unknown_Movie.mkv"
+        import re
+        file_name = re.sub(r'@[a-zA-Z0-9_]+', '', file_name)
+        file_name = file_name.strip()
+        
+        file_size = getattr(doc, 'file_size', 0)
+        beautiful_caption = generate_beautiful_caption(file_name, file_size)
+        
+        # Add to database
+        await movies_col.update_one({"file_name": file_name}, {"": {"file_name": file_name}}, upsert=True)
+        
+        # Forward to database channel safely
+        DATABASE_CHANNEL_ID = -1003975570574
+        await client.copy_message(
+            chat_id=DATABASE_CHANNEL_ID,
+            from_chat_id=message.chat.id,
+            message_id=message.id,
+            caption=beautiful_caption
+        )
+    except Exception as e:
+        print(f"Error monitoring channel: {e}")
 
 @app.on_message(filters.chat(CONTROL_CHANNEL_ID) & (filters.document | filters.video))
 async def manual_upload_handler(client, message):
